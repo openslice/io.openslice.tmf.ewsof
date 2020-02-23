@@ -32,8 +32,6 @@ import org.springframework.context.ApplicationContext;
  *
  */
 
-//
-
 //@EnableDiscoveryClient
 //@RefreshScope
 //@EnableConfigurationProperties
