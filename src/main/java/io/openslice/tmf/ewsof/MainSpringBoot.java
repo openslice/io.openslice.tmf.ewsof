@@ -71,27 +71,7 @@ public class MainSpringBoot implements CommandLineRunner {
 
 		applicationContext = new SpringApplication(MainSpringBoot.class).run(args);
 
-		WebClient.RequestBodySpec request1 = (RequestBodySpec) createWebClientWithServerURLAndDefaultValues().get().uri("/tmf-api/serviceCatalogManagement/v4/serviceCatalog");
-		WebClient.RequestBodySpec request2 = (RequestBodySpec) createWebClientWithServerURLAndDefaultValues().get().uri("/tmf-api/serviceCatalogManagement/v4/serviceSpecification");
 		
-		
-		List<ServiceCatalog> response2 = request1.exchange()
-				  .block()
-				  .bodyToMono( new ParameterizedTypeReference<List<ServiceCatalog>>() {})
-				  .block();
-		for (ServiceCatalog serviceCatalog : response2) {
-			System.out.println("serviceCatalog: " + serviceCatalog.getName());
-			
-		}
-		
-		List<ServiceSpecification> responseSpecs = request2.exchange()
-				  .block()
-				  .bodyToMono( new ParameterizedTypeReference<List<ServiceSpecification>>() {})
-				  .block();
-		for (ServiceSpecification spec : responseSpecs) {
-			System.out.println("spec: " + spec.getName());
-			
-		}
 	}
 
 	class ExitException extends RuntimeException implements ExitCodeGenerator {
@@ -104,14 +84,5 @@ public class MainSpringBoot implements CommandLineRunner {
 
 	}
 	
-
-    private static WebClient createWebClientWithServerURLAndDefaultValues() {
-        return WebClient.builder()
-            .baseUrl("http://portal.openslice.io:80")
-            .defaultCookie("cookieKey", "cookieValue")
-            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .defaultUriVariables(Collections.singletonMap("url", "http://portal.openslice.io:80"))
-            .build();
-    }
 
 }
