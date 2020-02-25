@@ -16,6 +16,17 @@ spring:
     pool:
       enabled: true
       max-connections: 100
+  security:
+    oauth2:
+      client:
+        provider:
+          authOpensliceProvider:
+            token-uri: http://portal.openslice.io/osapi-oauth-server/oauth/token
+        registration:
+          authOpensliceProvider:
+            client-id: osapiWebClientId
+            client-secret: secret
+            authorization-grant-type: client_credentials
 
 logging:
   level:
@@ -27,6 +38,15 @@ logging:
     console: "%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"
     file: "%d %p %c{1.} [%t] %m%n"
     
+oauthsign:
+   key: "EK97Y7Y9WPGG1MEG"
+   clientId: "osapiWebClientId"
+   tokenSecret: "secret"
+   scopes:
+   - "openapi"
+   - "admin"
+   - "read"
+   - "write"
 
 #QUEUE MESSAGES  
 CATALOG_GET_SERVICEORDERS: "jms:queue:CATALOG.GET.SERVICEORDERS"

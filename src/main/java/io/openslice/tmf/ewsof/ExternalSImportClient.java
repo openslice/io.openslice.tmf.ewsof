@@ -3,6 +3,7 @@ package io.openslice.tmf.ewsof;
 import java.util.Collections;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -18,7 +19,7 @@ import io.openslice.tmf.so641.model.ServiceOrder;
 @Service
 public class ExternalSImportClient {
 
-	
+	@Qualifier("authOpensliceProvider")
 	private final WebClient webClient;
 
 	public ExternalSImportClient(WebClient.Builder webClientBuilder) {
