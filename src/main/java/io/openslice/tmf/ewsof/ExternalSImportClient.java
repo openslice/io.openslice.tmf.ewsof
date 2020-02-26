@@ -1,6 +1,7 @@
 package io.openslice.tmf.ewsof;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -8,13 +9,21 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.util.Base64Utils;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClient.Builder;
 import org.springframework.web.reactive.function.client.WebClient.RequestBodySpec;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import io.openslice.tmf.scm633.model.ServiceCatalog;
 import io.openslice.tmf.scm633.model.ServiceSpecification;
 import io.openslice.tmf.so641.model.ServiceOrder;
+import reactor.core.publisher.Mono;
 
 @Service
 public class ExternalSImportClient {
@@ -27,7 +36,12 @@ public class ExternalSImportClient {
 	}
 	
 	 private WebClient createWebClientWithServerURLAndDefaultValues(Builder webClientBuilder) {
+
+			ExchangeStrategies exchangeStrategies = ExchangeStrategies.builder()
+	                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(-1)).build(); //spring.codec.max-in-memory-size=-1 ?? if use autoconfiguration
+			
 		 return  webClientBuilder
+	        	 .exchangeStrategies(exchangeStrategies)
 		            .baseUrl("http://portal.openslice.io:80")
 		            .defaultCookie("cookieKey", "cookieValue")
 		            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -37,7 +51,12 @@ public class ExternalSImportClient {
 	}
 
 	private WebClient createWebClientWithServerURLAndDefaultValues() {
+		
+		ExchangeStrategies exchangeStrategies = ExchangeStrategies.builder()
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(-1)).build(); //spring.codec.max-in-memory-size=-1 ?? if use autoconfiguration
+
 	        return WebClient.builder()
+	        	 .exchangeStrategies(exchangeStrategies)
 	            .baseUrl("http://portal.openslice.io:80")
 	            .defaultCookie("cookieKey", "cookieValue")
 	            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -76,20 +95,47 @@ public class ExternalSImportClient {
 		 * this needs authentication
 		 */
 		
-		List<ServiceOrder> responseOrders = request3.retrieve()
-				  .bodyToMono( new ParameterizedTypeReference<List<ServiceOrder>>() {})
-				  .block();
-		if ( responseOrders!=null ) {
-			for (ServiceOrder o : responseOrders) {
-				System.out.println("order: " + o.getDescription() );
-				
-			}			
-		}
+		 String encodedClientData = 
+			      Base64Utils.encodeToString("osapiWebClientId:secret".getBytes());
+		 
+		MultiValueMap<String, String> fd = new LinkedMultiValueMap<>();
+
+		fd.add("grant_type", "password");
+		fd.add("username", "admin");
+		fd.add("password", "openslice");
+		
+		
+		Mono<List<ServiceOrder>> resource = this.webClient.post()
+	      .uri("http://portal.openslice.io/osapi-oauth-server/oauth/token")
+	      .header("Authorization", "Basic " + encodedClientData)
+	      .body(BodyInserters.fromFormData( fd ))
+	      .retrieve()
+	      .bodyToMono(JsonNode.class)
+	      .flatMap(tokenResponse -> {
+	          String accessTokenValue = tokenResponse.get("access_token").textValue();
+	          return this.webClient.get()
+	            .uri("http://portal.openslice.io/tmf-api/serviceOrdering/v4/serviceOrder")
+	            .headers(h -> h.setBearerAuth(accessTokenValue))
+	            .retrieve()
+	            .bodyToMono(  new ParameterizedTypeReference<List<ServiceOrder>>() {} );
+	        });
+		List<ServiceOrder> responseOrders = resource.block();
+		
+		
+		
+		
+//		List<ServiceOrder> responseOrders = request3.retrieve()
+//				  .bodyToMono( new ParameterizedTypeReference<List<ServiceOrder>>() {})
+//				  .block();
+//		if ( responseOrders!=null ) {
+//			for (ServiceOrder o : responseOrders) {
+//				System.out.println("order date: " + o.getOrderDate()  );
+//				
+//			}			
+//		}
 
 		
 	}
-	
-
 
    
 }
