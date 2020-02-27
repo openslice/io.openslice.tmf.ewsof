@@ -4,6 +4,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -17,6 +20,7 @@ import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClient.Builder;
 import org.springframework.web.reactive.function.client.WebClient.RequestBodySpec;
+import org.springframework.web.reactive.function.client.WebClient.ResponseSpec;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -28,27 +32,30 @@ import reactor.core.publisher.Mono;
 @Service
 public class ExternalSImportClient {
 
-	@Qualifier("authOpensliceProvider")
-	private final WebClient webClient;
 
-	public ExternalSImportClient(WebClient.Builder webClientBuilder) {
-		this.webClient = createWebClientWithServerURLAndDefaultValues( webClientBuilder );
-	}
+	private static final transient Log log = LogFactory.getLog( ExternalSImportClient.class.getName());
 	
-	 private WebClient createWebClientWithServerURLAndDefaultValues(Builder webClientBuilder) {
+	@Autowired
+	WebClient webClient;
 
-			ExchangeStrategies exchangeStrategies = ExchangeStrategies.builder()
-	                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(-1)).build(); //spring.codec.max-in-memory-size=-1 ?? if use autoconfiguration
-			
-		 return  webClientBuilder
-	        	 .exchangeStrategies(exchangeStrategies)
-		            .baseUrl("http://portal.openslice.io:80")
-		            .defaultCookie("cookieKey", "cookieValue")
-		            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-		            .defaultUriVariables(Collections.singletonMap("url", "http://portal.openslice.io:80"))
-		            .build();
-
-	}
+//	public ExternalSImportClient(WebClient.Builder webClientBuilder) {
+//		this.webClient = createWebClientWithServerURLAndDefaultValues( webClientBuilder );
+//	}
+//	
+//	 private WebClient createWebClientWithServerURLAndDefaultValues(Builder webClientBuilder) {
+//
+//			ExchangeStrategies exchangeStrategies = ExchangeStrategies.builder()
+//	                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(-1)).build(); //spring.codec.max-in-memory-size=-1 ?? if use autoconfiguration
+//			
+//		 return  webClientBuilder
+//	        	 .exchangeStrategies(exchangeStrategies)
+//		            .baseUrl("http://portal.openslice.io:80")
+//		            .defaultCookie("cookieKey", "cookieValue")
+//		            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+//		            .defaultUriVariables(Collections.singletonMap("url", "http://portal.openslice.io:80"))
+//		            .build();
+//
+//	}
 
 	private WebClient createWebClientWithServerURLAndDefaultValues() {
 		
@@ -66,9 +73,9 @@ public class ExternalSImportClient {
 	
 	
 	public void getAll() {
-		WebClient.RequestBodySpec request1 = (RequestBodySpec) this.webClient.get().uri("/tmf-api/serviceCatalogManagement/v4/serviceCatalog");
+		WebClient.RequestBodySpec request1 = (RequestBodySpec) createWebClientWithServerURLAndDefaultValues().get().uri("/tmf-api/serviceCatalogManagement/v4/serviceCatalog");
 		WebClient.RequestBodySpec request2 = (RequestBodySpec) createWebClientWithServerURLAndDefaultValues().get().uri("/tmf-api/serviceCatalogManagement/v4/serviceSpecification");
-		WebClient.RequestBodySpec request3 = (RequestBodySpec) createWebClientWithServerURLAndDefaultValues().get().uri("/tmf-api/serviceOrdering/v4/serviceOrder");
+		//WebClient.RequestBodySpec request3 = (RequestBodySpec) createWebClientWithServerURLAndDefaultValues().get().uri("/tmf-api/serviceOrdering/v4/serviceOrder");
 		
 		
 		List<ServiceCatalog> response2 = request1.exchange()
@@ -95,44 +102,47 @@ public class ExternalSImportClient {
 		 * this needs authentication
 		 */
 		
-		 String encodedClientData = 
-			      Base64Utils.encodeToString("osapiWebClientId:secret".getBytes());
-		 
-		MultiValueMap<String, String> fd = new LinkedMultiValueMap<>();
-
-		fd.add("grant_type", "password");
-		fd.add("username", "admin");
-		fd.add("password", "openslice");
+//		 String encodedClientData = 
+//			      Base64Utils.encodeToString("osapiWebClientId:secret".getBytes());
+//		 
+//		MultiValueMap<String, String> fd = new LinkedMultiValueMap<>();
+//
+//		fd.add("grant_type", "password");
+//		fd.add("username", "admin");
+//		fd.add("password", "openslice");
+//		
+//		
+//		Mono<List<ServiceOrder>> resource = this.webClient.post()
+//	      .uri("http://portal.openslice.io/osapi-oauth-server/oauth/token")
+//	      .header("Authorization", "Basic " + encodedClientData)
+//	      .body(BodyInserters.fromFormData( fd ))
+//	      .retrieve()
+//	      .bodyToMono(JsonNode.class)
+//	      .flatMap(tokenResponse -> {
+//	          String accessTokenValue = tokenResponse.get("access_token").textValue();
+//	          return this.webClient.get()
+//	            .uri("http://portal.openslice.io/tmf-api/serviceOrdering/v4/serviceOrder")
+//	            .headers(h -> h.setBearerAuth(accessTokenValue))
+//	            .retrieve()
+//	            .bodyToMono(  new ParameterizedTypeReference<List<ServiceOrder>>() {} );
+//	        });
+//		List<ServiceOrder> responseOrders = resource.block();
 		
 		
-		Mono<List<ServiceOrder>> resource = this.webClient.post()
-	      .uri("http://portal.openslice.io/osapi-oauth-server/oauth/token")
-	      .header("Authorization", "Basic " + encodedClientData)
-	      .body(BodyInserters.fromFormData( fd ))
-	      .retrieve()
-	      .bodyToMono(JsonNode.class)
-	      .flatMap(tokenResponse -> {
-	          String accessTokenValue = tokenResponse.get("access_token").textValue();
-	          return this.webClient.get()
-	            .uri("http://portal.openslice.io/tmf-api/serviceOrdering/v4/serviceOrder")
-	            .headers(h -> h.setBearerAuth(accessTokenValue))
-	            .retrieve()
-	            .bodyToMono(  new ParameterizedTypeReference<List<ServiceOrder>>() {} );
-	        });
-		List<ServiceOrder> responseOrders = resource.block();
 		
-		
-		
-		
-//		List<ServiceOrder> responseOrders = request3.retrieve()
-//				  .bodyToMono( new ParameterizedTypeReference<List<ServiceOrder>>() {})
-//				  .block();
-//		if ( responseOrders!=null ) {
-//			for (ServiceOrder o : responseOrders) {
-//				System.out.println("order date: " + o.getOrderDate()  );
-//				
-//			}			
-//		}
+//		webClient.get().uri("/tmf-api/serviceOrdering/v4/serviceOrder")
+//				.exchange()			
+//                .subscribe(  it -> {log.debug("Success with HTTP Status "+ it.statusCode()); }  );
+		//System.out.println("ss : " + ss.bodyToMono(String.class).block().toString()  );
+		List<ServiceOrder> responseOrders = webClient.get().uri("/tmf-api/serviceOrdering/v4/serviceOrder").retrieve()
+				  .bodyToMono( new ParameterizedTypeReference<List<ServiceOrder>>() {})
+				  .block();
+		if ( responseOrders!=null ) {
+			for (ServiceOrder o : responseOrders) {
+				System.out.println("order date: " + o.getOrderDate()  );
+				
+			}			
+		}
 
 		
 	}
