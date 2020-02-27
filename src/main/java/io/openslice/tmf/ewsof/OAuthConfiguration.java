@@ -10,6 +10,7 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -17,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ClientHttpConnector;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.security.oauth2.client.AuthorizedClientServiceOAuth2AuthorizedClientManager;
+import org.springframework.security.oauth2.client.InMemoryOAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.OAuth2AuthorizationContext;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
@@ -44,142 +46,186 @@ import io.netty.handler.timeout.WriteTimeoutHandler;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.tcp.TcpClient;
 
-@Configuration
+//@Configuration
+/**
+ * @author ctranoris
+ *
+ * Since we need multiple clients to be created, we don;t use spring configuration, but they are created on demand
+ * see: https://github.com/spring-projects/spring-security/blob/master/docs/manual/src/docs/asciidoc/_includes/servlet/oauth2/oauth2-client.adoc#oauth2Client-client-creds-grant
+ */
 public class OAuthConfiguration implements WebMvcConfigurer {
 
-
-	private static final transient Log log = LogFactory.getLog( OAuthConfiguration.class.getName());
+	private static final transient Log log = LogFactory.getLog(OAuthConfiguration.class.getName());
+	private String username;
+	private String password;
+	private String clientRegistrationId;
 	
-//    @Bean("authOpensliceProvider") //bean qualifier
-//    WebClient webClient(ReactiveClientRegistrationRepository clientRegistrations) {
-//        ServerOAuth2AuthorizedClientExchangeFilterFunction oauth =
-//                new ServerOAuth2AuthorizedClientExchangeFilterFunction(
-//                        clientRegistrations,
-//                        new UnAuthenticatedServerOAuth2AuthorizedClientRepository());
-//        oauth.setDefaultClientRegistrationId("authOpensliceProvider");
-//        return WebClient.builder()
-//                .filter(oauth)
-//                .build();
-//    }
 	
-	@Bean
-	public WebClient messageWebClient(
-			ServletOAuth2AuthorizedClientExchangeFilterFunction servletOAuth2AuthorizedClientExchangeFilterFunction,
-	        ClientHttpConnector clientHttpConnector
-	) {
-
-
-
-        log.info("WebClientConfiguration.messageWebClient()");
-//	    ServletOAuth2AuthorizedClientExchangeFilterFunction oauth =
-//	            new ServletOAuth2AuthorizedClientExchangeFilterFunction(clientRegistrations, authorizedClients);
-
-//	    oauth.setDefaultClientRegistrationId("message");
-
-	    return WebClient.builder()
-	            .baseUrl("http://portal.openslice.io")
-	            .clientConnector(clientHttpConnector)
-	            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-	            .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
-	            .apply(servletOAuth2AuthorizedClientExchangeFilterFunction.oauth2Configuration())
-	            .filter(logRequest())
-	            .build();
+	OAuth2AuthorizedClientService clientService;
+	
+	/**
+	 * Note: the constructor might change to support the instantiation of multiple clientRegistrations
+	 * 
+	 * @param username
+	 * @param password
+	 * @param clientRegistrationId
+	 */
+	public OAuthConfiguration(String username, String password, String clientRegistrationId) {
+		super();
+		this.username = username;
+		this.password = password;
+		this.clientRegistrationId = clientRegistrationId;
 	}
-    
-     private ExchangeFilterFunction logRequest() {
-        return (clientRequest, next) -> {
-            log.info( "Request: " + clientRequest.method() +", "+ clientRequest.url());
-            clientRequest.headers()
-                    .forEach((name, values) -> values.forEach(value -> log.info("{"+name+"}={"+value+"}")));
-            return next.exchange(clientRequest);
-        };
-    }
 
-	@Bean
-    public ClientRegistrationRepository  clientRegistrations() {
+	public WebClient getWebClient(){
+			
+
+		InMemoryClientRegistrationRepository clientRegistrations = (InMemoryClientRegistrationRepository) this.clientRegistrations() ;
+		OAuth2AuthorizedClientService clientService = new InMemoryOAuth2AuthorizedClientService(clientRegistrations);
+		OAuth2AuthorizedClientManager authorizedClientManager = this.authorizedClientManager(clientRegistrations, clientService);
+				
 		
-
-        log.info("WebClientConfiguration.clientRegistrations()");
-        
-        ClientRegistration clientRegistration = ClientRegistration
-                .withRegistrationId("myregoauth")
-                .clientId("osapiWebClientId")
-                .clientSecret("secret")
-                .scope("admin")
-                .authorizationGrantType(AuthorizationGrantType.PASSWORD )
-                .tokenUri("http://portal.openslice.io/osapi-oauth-server/oauth/token")
-                .build();
-
-        return new InMemoryClientRegistrationRepository(clientRegistration);
-    }
+		ServletOAuth2AuthorizedClientExchangeFilterFunction servletOAuth2AuthorizedClientExchangeFilterFunction =
+				this.servletOAuth2AuthorizedClientExchangeFilterFunction(
+						clientRegistrations,
+						authorizedClientManager);
+		
+		ClientHttpConnector clientHttpConnector =  this.clientHttpConnector() ;
+		
+		return webClient(servletOAuth2AuthorizedClientExchangeFilterFunction, clientHttpConnector);		
+	}
 	
-	  @Bean
-	    public ServletOAuth2AuthorizedClientExchangeFilterFunction servletOAuth2AuthorizedClientExchangeFilterFunction(
-	            ClientRegistrationRepository clientRegistrations,
-	            OAuth2AuthorizedClientRepository authorizedClients,
-	            OAuth2AuthorizedClientManager authorizedClientManager
-	    ) {
+	
+	//@Bean
+	public WebClient webClient(
+			ServletOAuth2AuthorizedClientExchangeFilterFunction servletOAuth2AuthorizedClientExchangeFilterFunction,
+			ClientHttpConnector clientHttpConnector) {
 
-	        ServletOAuth2AuthorizedClientExchangeFilterFunction oauth =
-	                new ServletOAuth2AuthorizedClientExchangeFilterFunction(authorizedClientManager);
+		log.info("WebClientConfiguration.messageWebClient()");
 
-	        //oauth.setDefaultOAuth2AuthorizedClient(true);
-	        oauth.setDefaultClientRegistrationId("myregoauth");
-	        //oauth.setAccessTokenExpiresSkew(Duration.ofSeconds(30));
+		return WebClient.builder().baseUrl("http://portal.openslice.io").clientConnector(clientHttpConnector)
+				.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+				.defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+				.apply(servletOAuth2AuthorizedClientExchangeFilterFunction.oauth2Configuration()).filter(logRequest())
+				.build();
+	}
+	
+	
 
-	        return oauth;
-	    }
+	private ExchangeFilterFunction logRequest() {
+		return (clientRequest, next) -> {
+			log.info("Request: " + clientRequest.method() + ", " + clientRequest.url());
+			clientRequest.headers()
+					.forEach((name, values) -> values.forEach(value -> log.info("{" + name + "}={" + value + "}")));
+			return next.exchange(clientRequest);
+		};
+	}
 
-	    @Bean
-	    public ClientHttpConnector clientHttpConnector() {
+	//@Bean
+	public ClientRegistrationRepository clientRegistrations() {
 
-	        log.info("WebClientConfiguration.clientHttpConnector()");
+		log.info("WebClientConfiguration.clientRegistrations()");
 
-	        TcpClient tcpClient = TcpClient.create()
-	                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 2000)
-	                .doOnConnected(connection ->
-	                        connection.addHandlerLast(new ReadTimeoutHandler(1))
-	                                .addHandlerLast(new WriteTimeoutHandler(1))
-	                );
+		ClientRegistration clientRegistration = ClientRegistration.withRegistrationId("authOpensliceProvider")
+				.clientId("osapiWebClientId").clientSecret("secret").scope("admin")
+				.authorizationGrantType(AuthorizationGrantType.PASSWORD)
+				.tokenUri("http://portal.openslice.io/osapi-oauth-server/oauth/token").build();
 
-	        return new ReactorClientHttpConnector(HttpClient.from(tcpClient));
-	    }
-	    
-	    @Bean
-	    public OAuth2AuthorizedClientManager authorizedClientManager(
-	            ClientRegistrationRepository clientRegistrationRepository,
-	            OAuth2AuthorizedClientService clientService)
-	    {
+		return new InMemoryClientRegistrationRepository(clientRegistration);
+	}
 
-	        OAuth2AuthorizedClientProvider authorizedClientProvider = 
-	            OAuth2AuthorizedClientProviderBuilder.builder()
-	                .clientCredentials()
-	                .build();
+	  //@Bean
+	public ServletOAuth2AuthorizedClientExchangeFilterFunction servletOAuth2AuthorizedClientExchangeFilterFunction(
+			ClientRegistrationRepository clientRegistrations,
+			
+			OAuth2AuthorizedClientManager authorizedClientManager) {
 
-	        AuthorizedClientServiceOAuth2AuthorizedClientManager authorizedClientManager = 
-	            new AuthorizedClientServiceOAuth2AuthorizedClientManager(
-	                clientRegistrationRepository, clientService);
-	        authorizedClientManager.setAuthorizedClientProvider(authorizedClientProvider);
-	        authorizedClientManager.setContextAttributesMapper(contextAttributesMapper());
-	        return authorizedClientManager;
-	    }
+		ServletOAuth2AuthorizedClientExchangeFilterFunction oauth = new ServletOAuth2AuthorizedClientExchangeFilterFunction(
+				authorizedClientManager);
 
-		private Function<OAuth2AuthorizeRequest, Map<String, Object>> contextAttributesMapper() {
-			return authorizeRequest -> {
-				Map<String, Object> contextAttributes = Collections.emptyMap();
-				HttpServletRequest servletRequest = authorizeRequest.getAttribute(HttpServletRequest.class.getName());
-				String username = "admin";// servletRequest.getParameter(OAuth2ParameterNames.USERNAME);
-				String password = "openslice";//servletRequest.getParameter(OAuth2ParameterNames.PASSWORD);
-				if (StringUtils.hasText(username) && StringUtils.hasText(password)) {
-					contextAttributes = new HashMap<>();
+		// oauth.setDefaultOAuth2AuthorizedClient(true);
+		//oauth.setDefaultClientRegistrationId("authOpensliceProvider");
+		oauth.setDefaultClientRegistrationId( this.clientRegistrationId );
+		
+		// oauth.setAccessTokenExpiresSkew(Duration.ofSeconds(30));
 
-					// `PasswordOAuth2AuthorizedClientProvider` requires both attributes
-					contextAttributes.put(OAuth2AuthorizationContext.USERNAME_ATTRIBUTE_NAME, username);
-					contextAttributes.put(OAuth2AuthorizationContext.PASSWORD_ATTRIBUTE_NAME, password);
-				}
-				return contextAttributes;
-			};
-		}
+		return oauth;
+	}
 
-    
+	    //@Bean
+	public ClientHttpConnector clientHttpConnector() {
+
+		log.info("WebClientConfiguration.clientHttpConnector()");
+
+		TcpClient tcpClient = TcpClient.create().option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 2000)
+				.doOnConnected(connection -> connection.addHandlerLast(new ReadTimeoutHandler(1))
+						.addHandlerLast(new WriteTimeoutHandler(1)));
+
+		return new ReactorClientHttpConnector(HttpClient.from(tcpClient));
+	}
+
+	    //@Bean
+	public OAuth2AuthorizedClientManager authorizedClientManager(
+			ClientRegistrationRepository clientRegistrationRepository, 
+			OAuth2AuthorizedClientService clientService) {
+
+		OAuth2AuthorizedClientProvider authorizedClientProvider = OAuth2AuthorizedClientProviderBuilder.builder()
+				// .clientCredentials()
+				.password().refreshToken().build();
+
+		AuthorizedClientServiceOAuth2AuthorizedClientManager authorizedClientManager = 
+				new AuthorizedClientServiceOAuth2AuthorizedClientManager(
+				clientRegistrationRepository, clientService);
+		authorizedClientManager.setAuthorizedClientProvider(authorizedClientProvider);
+		authorizedClientManager.setContextAttributesMapper(contextAttributesMapper());
+		return authorizedClientManager;
+	}
+
+	private Function<OAuth2AuthorizeRequest, Map<String, Object>> contextAttributesMapper() {
+		return authorizeRequest -> {
+			Map<String, Object> contextAttributes = Collections.emptyMap();
+			HttpServletRequest servletRequest = authorizeRequest.getAttribute(HttpServletRequest.class.getName());
+			// String username = "admin";//
+			// servletRequest.getParameter(OAuth2ParameterNames.USERNAME);
+			// String password =
+			// "openslice";//servletRequest.getParameter(OAuth2ParameterNames.PASSWORD);
+			if (StringUtils.hasText(username) && StringUtils.hasText(password)) {
+				contextAttributes = new HashMap<>();
+
+				// `PasswordOAuth2AuthorizedClientProvider` requires both attributes
+				contextAttributes.put(OAuth2AuthorizationContext.USERNAME_ATTRIBUTE_NAME, this.username);
+				contextAttributes.put(OAuth2AuthorizationContext.PASSWORD_ATTRIBUTE_NAME, this.password);
+			}
+			return contextAttributes;
+		};
+	}
+
+	/**
+	 * @return the username
+	 */
+	public String getUsername() {
+		return username;
+	}
+
+	/**
+	 * @param username the username to set
+	 */
+	public void setUsername(String username) {
+		this.username = username;
+	}
+
+	/**
+	 * @return the password
+	 */
+	public String getPassword() {
+		return password;
+	}
+
+	/**
+	 * @param password the password to set
+	 */
+	public void setPassword(String password) {
+		this.password = password;
+	}
+
 }

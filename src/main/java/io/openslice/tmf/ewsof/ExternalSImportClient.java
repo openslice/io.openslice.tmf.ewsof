@@ -35,9 +35,9 @@ public class ExternalSImportClient {
 
 
 	private static final transient Log log = LogFactory.getLog( ExternalSImportClient.class.getName());
-	
-	@Autowired
-	WebClient webClient;
+
+	private static WebClient webClient;
+	private static WebClient webClient2;
 
 	private Object authorizedClient;
 
@@ -136,14 +136,40 @@ public class ExternalSImportClient {
 //				.exchange()			
 //                .subscribe(  it -> {log.debug("Success with HTTP Status "+ it.statusCode()); }  );
 		//System.out.println("ss : " + ss.bodyToMono(String.class).block().toString()  );
-		List<ServiceOrder> responseOrders = webClient.get().uri("/tmf-api/serviceOrdering/v4/serviceOrder")
-					.attributes( ServletOAuth2AuthorizedClientExchangeFilterFunction.clientRegistrationId("myregoauth"))
+		
+		if ( webClient == null) {
+			OAuthConfiguration oac = new OAuthConfiguration("admin", "openslice", "authOpensliceProvider");
+			webClient = oac.getWebClient(); 
+		}
+		
+		List<ServiceOrder> responseOrders = webClient.get()
+				.uri("/tmf-api/serviceOrdering/v4/serviceOrder")
+					.attributes( ServletOAuth2AuthorizedClientExchangeFilterFunction.clientRegistrationId("authOpensliceProvider"))
 					.retrieve()
 				  .bodyToMono( new ParameterizedTypeReference<List<ServiceOrder>>() {})
 				  .block();
 		if ( responseOrders!=null ) {
 			for (ServiceOrder o : responseOrders) {
 				System.out.println("order date: " + o.getOrderDate()  );
+				
+			}			
+		}
+		
+		
+		if ( webClient2 == null) {
+			OAuthConfiguration oac = new OAuthConfiguration("admin", "openslice", "authOpensliceProvider");
+			webClient2 = oac.getWebClient(); 
+		}
+		
+		responseOrders = webClient2.get()
+				.uri("/tmf-api/serviceOrdering/v4/serviceOrder")
+					.attributes( ServletOAuth2AuthorizedClientExchangeFilterFunction.clientRegistrationId("authOpensliceProvider"))
+					.retrieve()
+				  .bodyToMono( new ParameterizedTypeReference<List<ServiceOrder>>() {})
+				  .block();
+		if ( responseOrders!=null ) {
+			for (ServiceOrder o : responseOrders) {
+				System.out.println("order id: " + o.getId() );
 				
 			}			
 		}
