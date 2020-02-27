@@ -17,6 +17,7 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
  *
  *https://stackoverflow.com/questions/55894460/is-spring-boot-webclient-oauth2-client-credentials-supported
  *https://github.com/fdlessard/SpringBootOauth2WebClient
+ *https://github.com/spring-projects/spring-security/blob/master/docs/manual/src/docs/asciidoc/_includes/servlet/oauth2/oauth2-client.adoc#oauth2Client-client-creds-grant
  */
 @Configuration
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter {

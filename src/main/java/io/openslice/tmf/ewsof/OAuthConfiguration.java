@@ -102,10 +102,10 @@ public class OAuthConfiguration implements WebMvcConfigurer {
         log.info("WebClientConfiguration.clientRegistrations()");
         
         ClientRegistration clientRegistration = ClientRegistration
-                .withRegistrationId("message")
+                .withRegistrationId("myregoauth")
                 .clientId("osapiWebClientId")
                 .clientSecret("secret")
-                .scope("admin,read,write")
+                .scope("admin")
                 .authorizationGrantType(AuthorizationGrantType.PASSWORD )
                 .tokenUri("http://portal.openslice.io/osapi-oauth-server/oauth/token")
                 .build();
@@ -124,7 +124,7 @@ public class OAuthConfiguration implements WebMvcConfigurer {
 	                new ServletOAuth2AuthorizedClientExchangeFilterFunction(authorizedClientManager);
 
 	        //oauth.setDefaultOAuth2AuthorizedClient(true);
-	        oauth.setDefaultClientRegistrationId("message");
+	        oauth.setDefaultClientRegistrationId("myregoauth");
 	        //oauth.setAccessTokenExpiresSkew(Duration.ofSeconds(30));
 
 	        return oauth;

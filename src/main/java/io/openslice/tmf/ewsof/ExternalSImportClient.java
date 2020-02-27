@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.client.web.reactive.function.client.ServletOAuth2AuthorizedClientExchangeFilterFunction;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Base64Utils;
 import org.springframework.util.LinkedMultiValueMap;
@@ -37,6 +38,8 @@ public class ExternalSImportClient {
 	
 	@Autowired
 	WebClient webClient;
+
+	private Object authorizedClient;
 
 //	public ExternalSImportClient(WebClient.Builder webClientBuilder) {
 //		this.webClient = createWebClientWithServerURLAndDefaultValues( webClientBuilder );
@@ -129,12 +132,13 @@ public class ExternalSImportClient {
 //		List<ServiceOrder> responseOrders = resource.block();
 		
 		
-		
 //		webClient.get().uri("/tmf-api/serviceOrdering/v4/serviceOrder")
 //				.exchange()			
 //                .subscribe(  it -> {log.debug("Success with HTTP Status "+ it.statusCode()); }  );
 		//System.out.println("ss : " + ss.bodyToMono(String.class).block().toString()  );
-		List<ServiceOrder> responseOrders = webClient.get().uri("/tmf-api/serviceOrdering/v4/serviceOrder").retrieve()
+		List<ServiceOrder> responseOrders = webClient.get().uri("/tmf-api/serviceOrdering/v4/serviceOrder")
+					.attributes( ServletOAuth2AuthorizedClientExchangeFilterFunction.clientRegistrationId("myregoauth"))
+					.retrieve()
 				  .bodyToMono( new ParameterizedTypeReference<List<ServiceOrder>>() {})
 				  .block();
 		if ( responseOrders!=null ) {
