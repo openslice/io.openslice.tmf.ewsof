@@ -1,64 +1,49 @@
 package io.openslice.tmf.ewsof;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import javax.net.ssl.SSLException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.security.oauth2.client.web.reactive.function.client.ServletOAuth2AuthorizedClientExchangeFilterFunction;
 import org.springframework.stereotype.Service;
-import org.springframework.util.Base64Utils;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
+import org.springframework.web.reactive.function.client.ExchangeFilterFunctions;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClient.Builder;
 import org.springframework.web.reactive.function.client.WebClient.RequestBodySpec;
-import org.springframework.web.reactive.function.client.WebClient.ResponseSpec;
 
-import com.fasterxml.jackson.databind.JsonNode;
-
+import io.netty.channel.ChannelOption;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.handler.timeout.WriteTimeoutHandler;
 import io.openslice.tmf.scm633.model.ServiceCatalog;
 import io.openslice.tmf.scm633.model.ServiceSpecification;
 import io.openslice.tmf.so641.model.ServiceOrder;
 import reactor.core.publisher.Mono;
+import reactor.netty.http.client.HttpClient;
+import reactor.netty.tcp.TcpClient;
 
 @Service
 public class ExternalSImportClient {
 
 
-	private static final transient Log log = LogFactory.getLog( ExternalSImportClient.class.getName());
+	private static final transient Logger log = LoggerFactory.getLogger( ExternalSImportClient.class.getName());
 
 	private static WebClient webClient;
 	private static WebClient webClient2;
 
 	private Object authorizedClient;
 
-//	public ExternalSImportClient(WebClient.Builder webClientBuilder) {
-//		this.webClient = createWebClientWithServerURLAndDefaultValues( webClientBuilder );
-//	}
-//	
-//	 private WebClient createWebClientWithServerURLAndDefaultValues(Builder webClientBuilder) {
-//
-//			ExchangeStrategies exchangeStrategies = ExchangeStrategies.builder()
-//	                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(-1)).build(); //spring.codec.max-in-memory-size=-1 ?? if use autoconfiguration
-//			
-//		 return  webClientBuilder
-//	        	 .exchangeStrategies(exchangeStrategies)
-//		            .baseUrl("http://portal.openslice.io:80")
-//		            .defaultCookie("cookieKey", "cookieValue")
-//		            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-//		            .defaultUriVariables(Collections.singletonMap("url", "http://portal.openslice.io:80"))
-//		            .build();
-//
-//	}
 
 	private WebClient createWebClientWithServerURLAndDefaultValues() {
 		
@@ -75,7 +60,7 @@ public class ExternalSImportClient {
 	    }
 	
 	
-	public void getAll() {
+	public void getAll() throws SSLException {
 		WebClient.RequestBodySpec request1 = (RequestBodySpec) createWebClientWithServerURLAndDefaultValues().get().uri("/tmf-api/serviceCatalogManagement/v4/serviceCatalog");
 		WebClient.RequestBodySpec request2 = (RequestBodySpec) createWebClientWithServerURLAndDefaultValues().get().uri("/tmf-api/serviceCatalogManagement/v4/serviceSpecification");
 		//WebClient.RequestBodySpec request3 = (RequestBodySpec) createWebClientWithServerURLAndDefaultValues().get().uri("/tmf-api/serviceOrdering/v4/serviceOrder");
@@ -138,7 +123,7 @@ public class ExternalSImportClient {
 		//System.out.println("ss : " + ss.bodyToMono(String.class).block().toString()  );
 		
 		if ( webClient == null) {
-			OAuthConfiguration oac = new OAuthConfiguration("admin", "openslice", "authOpensliceProvider");
+			GenericClient oac = new GenericClient("admin", "openslice", "authOpensliceProvider", "http://portal.openslice.io" );
 			webClient = oac.getWebClient(); 
 		}
 		
@@ -157,7 +142,7 @@ public class ExternalSImportClient {
 		
 		
 		if ( webClient2 == null) {
-			OAuthConfiguration oac = new OAuthConfiguration("admin", "openslice", "authOpensliceProvider");
+			GenericClient oac = new GenericClient("admin", "openslice", "authOpensliceProvider", "http://portal.openslice.io");
 			webClient2 = oac.getWebClient(); 
 		}
 		
@@ -175,7 +160,73 @@ public class ExternalSImportClient {
 		}
 
 		
+		
+		
+		
+		ExchangeStrategies exchangeStrategies = ExchangeStrategies.builder()
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(-1)).build(); //spring.codec.max-in-memory-size=-1 ?? if use autoconfiguration
+
+		var tcpClient = TcpClient.create()
+			      .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 2_000)
+			      .doOnConnected(connection ->
+			        connection.addHandlerLast(new ReadTimeoutHandler(2))
+			          .addHandlerLast(new WriteTimeoutHandler(2)));
+		SslContext sslContext = SslContextBuilder
+				.forClient()
+				.trustManager(InsecureTrustManagerFactory.INSTANCE)
+				.build();
+		WebClient webClient3 =    WebClient.builder()
+	        	 .exchangeStrategies(exchangeStrategies)
+	        	 .clientConnector(new ReactorClientHttpConnector(
+	        			 HttpClient.from(tcpClient)
+	        			 .secure( sslContextSpec -> sslContextSpec.sslContext(sslContext) ))
+	        			 )
+	            .baseUrl("https://patras5g.eu")
+	            .defaultCookie("cookieKey", "cookieValue")
+	            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+	            .filter(ExchangeFilterFunctions.basicAuthentication("username", "pass"))
+	            .defaultUriVariables(Collections.singletonMap("url", "https://patras5g.eu"))
+	            .build();
+		
+		String resp= webClient3.get()
+				.uri("/apiportal/services/api/repo/vxfs")
+					.attributes( ServletOAuth2AuthorizedClientExchangeFilterFunction.clientRegistrationId("authOpensliceProvider"))
+					.retrieve()
+					.onStatus(HttpStatus::is4xxClientError, response -> {
+				        System.out.println("4xx eror");
+				        return Mono.error(new RuntimeException("4xx"));
+				      })
+				      .onStatus(HttpStatus::is5xxServerError, response -> {
+				        System.out.println("5xx eror");
+				        return Mono.error(new RuntimeException("5xx"));
+				      })
+				  .bodyToMono( String.class)
+				  .block();
+				
+
+				System.out.println("resp: " + resp );
 	}
 
-   
+	private ExchangeFilterFunction logRequest() {
+	    return (clientRequest, next) -> {
+	      log.info("Request: {} {}", clientRequest.method(), clientRequest.url());
+	      log.info("--- Http Headers: ---");
+	      clientRequest.headers().forEach(this::logHeader);
+	      log.info("--- Http Cookies: ---");
+	      clientRequest.cookies().forEach(this::logHeader);
+	      return next.exchange(clientRequest);
+	    };
+	  }
+	 
+	  private ExchangeFilterFunction logResponse() {
+	    return ExchangeFilterFunction.ofResponseProcessor(clientResponse -> {
+	      log.info("Response: {}", clientResponse.statusCode());
+	      clientResponse.headers().asHttpHeaders()
+	        .forEach((name, values) -> values.forEach(value -> log.info("{}={}", name, value)));
+	      return Mono.just(clientResponse);
+	    });
+	  }
+	  private void logHeader(String name, List<String> values) {
+		    values.forEach(value -> log.info("{}={}", name, value));
+		  }
 }

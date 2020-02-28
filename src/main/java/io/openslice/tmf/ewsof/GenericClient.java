@@ -51,17 +51,19 @@ import reactor.netty.tcp.TcpClient;
  * @author ctranoris
  *
  * Since we need multiple clients to be created, we don;t use spring configuration, but they are created on demand
+ * We implement here a Servlet integration
  * see: https://github.com/spring-projects/spring-security/blob/master/docs/manual/src/docs/asciidoc/_includes/servlet/oauth2/oauth2-client.adoc#oauth2Client-client-creds-grant
  */
-public class OAuthConfiguration implements WebMvcConfigurer {
+public class GenericClient  {
 
-	private static final transient Log log = LogFactory.getLog(OAuthConfiguration.class.getName());
+	private static final transient Log log = LogFactory.getLog(GenericClient.class.getName());
 	private String username;
 	private String password;
 	private String clientRegistrationId;
 	
 	
 	OAuth2AuthorizedClientService clientService;
+	private String baseUrl;
 	
 	/**
 	 * Note: the constructor might change to support the instantiation of multiple clientRegistrations
@@ -70,11 +72,12 @@ public class OAuthConfiguration implements WebMvcConfigurer {
 	 * @param password
 	 * @param clientRegistrationId
 	 */
-	public OAuthConfiguration(String username, String password, String clientRegistrationId) {
+	public GenericClient(String username, String password, String clientRegistrationId, String baseUrl) {
 		super();
 		this.username = username;
 		this.password = password;
 		this.clientRegistrationId = clientRegistrationId;
+		this.baseUrl = baseUrl;
 	}
 
 	public WebClient getWebClient(){
@@ -103,7 +106,7 @@ public class OAuthConfiguration implements WebMvcConfigurer {
 
 		log.info("WebClientConfiguration.messageWebClient()");
 
-		return WebClient.builder().baseUrl("http://portal.openslice.io").clientConnector(clientHttpConnector)
+		return WebClient.builder().baseUrl( this.baseUrl ).clientConnector(clientHttpConnector)
 				.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
 				.defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
 				.apply(servletOAuth2AuthorizedClientExchangeFilterFunction.oauth2Configuration()).filter(logRequest())
