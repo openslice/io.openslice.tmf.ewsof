@@ -1,5 +1,6 @@
 package io.openslice.tmf.ewsof;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -226,7 +227,32 @@ public class ExternalSImportClient {
 	      return Mono.just(clientResponse);
 	    });
 	  }
+	  
+	  
 	  private void logHeader(String name, List<String> values) {
 		    values.forEach(value -> log.info("{}={}", name, value));
-		  }
+	 }
+	  
+	  
+	 public List<ServiceSpecification> getExternalPartners() {
+		 log.info("getExternalPartners");
+//		 return new ArrayList<ServiceSpecification>();
+		 
+			WebClient.RequestBodySpec request2 = (RequestBodySpec) createWebClientWithServerURLAndDefaultValues().get().uri("/tmf-api/serviceCatalogManagement/v4/serviceSpecification");
+			List<ServiceSpecification> responseSpecs = request2.exchange()
+					  .block()
+					  .bodyToMono( new ParameterizedTypeReference<List<ServiceSpecification>>() {})
+					  .block();
+
+			 log.info("responseSpecs = " + responseSpecs.size());
+			return responseSpecs;
+			
+	 }
+	 
+	 public void printAllSpecs( List<ServiceSpecification> responseSpecs) {
+			for (ServiceSpecification spec : responseSpecs) {
+				System.out.println("spec retreived: " + spec.getName());
+				
+			}
+	 }
 }
