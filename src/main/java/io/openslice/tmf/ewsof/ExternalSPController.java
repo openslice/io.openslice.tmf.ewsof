@@ -36,6 +36,9 @@ public class ExternalSPController {
 	@Value("${CATALOG_GET_EXTERNAL_SERVICE_PARTNERS}")
 	private String CATALOG_GET_EXTERNAL_SERVICE_PARTNERS = "";
 	
+	
+	private List<Organization> externalProviders = new ArrayList<>();
+	
 	public List<Organization> fetchSPs() {
 		
 		logger.info("will retrieve Service Providers  from catalog "   );
@@ -52,7 +55,7 @@ public class ExternalSPController {
 			Class<List<Organization>> clazz = (Class) List.class;
 			List<Organization> organizations = mapJsonToObjectList( new Organization(), (String)response, Organization.class  ); 
 			logger.debug("retrieveSPs response is: " + response);
-			
+			externalProviders = organizations;
 			return organizations;
 			
 		}catch (Exception e) {
@@ -82,4 +85,16 @@ public class ExternalSPController {
 //	      System.out.println(list.get(0).getClass());
 	      return list;
 	   }
+
+
+
+	public List<Organization> getExternalProviders() {
+		return externalProviders;
+	}
+
+
+
+	public void setExternalProviders(List<Organization> externalProviders) {
+		this.externalProviders = externalProviders;
+	}
 }

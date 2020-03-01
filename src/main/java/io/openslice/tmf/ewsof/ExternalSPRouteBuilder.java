@@ -47,6 +47,9 @@ public class ExternalSPRouteBuilder extends RouteBuilder {
 		
 		from("timer://getSpecsTimer?delay=2000&period=20000&daemon=true")
 		.id("timerFetchSPs")
+		.to("seda:startProcess");
+		
+		from("seda:startProcess")
 		.log(LoggingLevel.INFO, log, "1-Check External SP Specs")	
 		.bean( externalSPController, "fetchSPs")	
 		.process(exchange -> log.info("2-The response code is: {}", exchange.getMessage() .getBody() ));

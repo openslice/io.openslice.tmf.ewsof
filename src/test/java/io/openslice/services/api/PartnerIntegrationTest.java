@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.camel.CamelContext;
+import org.apache.camel.ProducerTemplate;
 import org.apache.camel.RoutesBuilder;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.commons.logging.Log;
@@ -46,6 +47,11 @@ public class PartnerIntegrationTest {
     @Autowired
     ExternalSPController externalSPController;
     
+
+    @Autowired
+    private ProducerTemplate template;
+
+    
 	SPMocked scmocked = new SPMocked();
     
 	@Test
@@ -63,11 +69,10 @@ public class PartnerIntegrationTest {
 		
 		camelContext.addRoutes(builder);
 		
-		List<Organization> sps = externalSPController.fetchSPs();
-
-		assertThat( sps  ).isInstanceOf( List.class); //Organization
-		assertThat( sps).hasSize(1);
-		assertThat( sps.get(0) ).isInstanceOf( Organization.class);
+		template.requestBody("seda:startProcess", "");
+		
+		
+		assertThat( externalSPController.getExternalProviders() ).hasSize(1);
 		
 		logger.info("waiting 1secs");
 		Thread.sleep(1000); // wait
