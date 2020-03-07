@@ -100,7 +100,7 @@ public class GenericClient  {
 	
 	
 	//@Bean
-	public WebClient webClient(
+	private WebClient webClient(
 			ServletOAuth2AuthorizedClientExchangeFilterFunction servletOAuth2AuthorizedClientExchangeFilterFunction,
 			ClientHttpConnector clientHttpConnector) {
 
